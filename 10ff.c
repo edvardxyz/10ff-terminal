@@ -11,38 +11,17 @@
 #define LSIZ 32
 #define RSIZ 256
 
-void drawbox(int,int,int);
-int print_ran(int,int);
-
 void printwords(char (*words)[LSIZ],int first_index, int last_index, int row, int col){
-    //mvprintw(0, 0, "%d ", last_index);
     move(row, col);
     for(int i = first_index; i < last_index; i++){
         printw("%s ", words[i]);
     }
 }
 
-int getlastindex(char (*words)[LSIZ], int box_len, int first_index){
-
-    int ch_count = 0;
-
-    while(ch_count < box_len){
-        ch_count += strlen(words[first_index]) + 1;
-        first_index++;
-    }
-    return first_index-1;
-}
-
 int main()
 {
     srand(time(0));
     initscr();
-    if(has_colors() == FALSE){
-        endwin();
-        printf("Your terminal does not support color\n");
-        return 1;
-    }
-
     start_color();
     cbreak();
     noecho();
@@ -86,12 +65,9 @@ int main()
     int start_col_output = start_col_box + 1;
     int start_row_output = mid_row + 1;
 
-    drawbox(mid_row, start_col_box, end_col_box);
+   //printwords(words, 0, , start_row_output,start_col_output);
 
-    int last_index = getlastindex(words, mid_col-2, 0);
-    printwords(words, 0, last_index, start_row_output,start_col_output);
-
-    printwords(words,last_index, getlastindex(words, mid_col-2, last_index), start_row_output+1,start_col_output);
+    //printwords(words,last_index, getlastindex(words, mid_col-2, last_index), start_row_output+1,start_col_output);
 
     move(current_row,current_col);
     refresh();
@@ -128,26 +104,3 @@ int main()
 
     endwin();
     return 0;
-}
-
-
-
-void drawbox(int row, int start_col, int end_col){
-
-    mvaddch(row, start_col, ACS_ULCORNER);
-
-    for(int i = 1; i < end_col-start_col; i++){
-        mvaddch(row, start_col+i, ACS_HLINE);
-        mvaddch(row+BOX_HEIGHT, start_col+i, ACS_HLINE);
-    }
-
-    mvaddch(row, end_col, ACS_URCORNER);
-
-    for(int i = 1; i < BOX_HEIGHT; i++){
-        mvaddch(row+i, start_col, ACS_VLINE);
-        mvaddch(row+i, end_col, ACS_VLINE);
-    }
-
-    mvaddch(row+BOX_HEIGHT, start_col, ACS_LLCORNER);
-    mvaddch(row+BOX_HEIGHT, end_col, ACS_LRCORNER);
-}
