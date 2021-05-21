@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define BOX_HEIGHT 4
 #define CTRL_BACKSPACE 0x08
 #define ENTER 0x0a
 #define SPACE ' '
@@ -31,7 +30,7 @@ int main()
     FILE *fptr = NULL;
     int i = 0;
     int total = 0;
-    char words[256][LSIZ];
+    char words[RSIZ][LSIZ];
 
     fptr = fopen("words.txt", "r");
     while(fgets(line[i], LSIZ, fptr)){
@@ -39,10 +38,9 @@ int main()
         i++;
     }
     total = i;
-    for (i = 0; i < 256; ++i){
+    for (i = 0; i < RSIZ; ++i){
         strncpy(words[i], line[rand() % (total)], LSIZ);
     }
-    char c;
     //for (i = 0; i < 256; ++i) {
     //    printf("%s\n\n", words[i]);
     //}
@@ -57,17 +55,17 @@ int main()
     getmaxyx(stdscr,max_row,max_col);
     int mid_row = max_row/2;
     int mid_col = max_col/2;
-    int start_col_box = mid_col/2;
-    int end_col_box = max_col-start_col_box;
-    int current_row = mid_row+BOX_HEIGHT+2;
+    int current_row = mid_row+2;
     int current_col = mid_col;
     int start_col_input = current_col;
-    int start_col_output = start_col_box + 1;
-    int start_row_output = mid_row + 1;
+    int start_col_output = mid_col;
+    int start_row_output = mid_row;
 
    //printwords(words, 0, , start_row_output,start_col_output);
 
     //printwords(words,last_index, getlastindex(words, mid_col-2, last_index), start_row_output+1,start_col_output);
+   printwords(words, 0, 10, start_row_output, start_col_output);
+   printwords(words, 10, 20, start_row_output+1, start_col_output);
 
     move(current_row,current_col);
     refresh();
@@ -104,3 +102,4 @@ int main()
 
     endwin();
     return 0;
+}
