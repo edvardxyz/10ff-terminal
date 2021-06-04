@@ -181,7 +181,7 @@ int main()
             break;
     }
     for(int i = 0; i < cwidx; i++){
-        totalch += strlen(words[correctwords[i]]);
+        totalch += strlen(words[correctwords[i]]) + 1;
     }
 
     printf("Typed %d words correct ", cwidx);
