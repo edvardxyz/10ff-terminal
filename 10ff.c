@@ -4,35 +4,89 @@
 #include <stdlib.h>
 #include <time.h>
 
+#define BOX_HEIGHT 4
 #define CTRL_BACKSPACE 0x08
 #define ENTER 0x0a
 #define SPACE ' '
 #define LSIZ 32
-#define RSIZ 256
+#define RSIZ 300
 
-void printwords(char (*words)[LSIZ],int first_index, int last_index, int row, int col){
-    move(row, col);
-    for(int i = first_index; i < last_index; i++){
-        printw("%s ", words[i]);
+int getlastindex(char (*words)[LSIZ], int box_len, int first_index){
+    int ch_count = 0;
+    while(ch_count < box_len){
+        ch_count += strlen(words[first_index]) + 1;
+        first_index++;
     }
+    return --first_index;
+}
+
+int printwords(char (*words)[LSIZ], WINDOW *words_win, int first_index, int typedwidx, int colorpair){
+    int col = COLS/2-4;
+    int last_index = getlastindex(words, col, first_index);
+
+    wmove(words_win, 1, 2);
+    for(;first_index < last_index; first_index++){
+        if(first_index == typedwidx){
+            wattron(words_win, COLOR_PAIR(colorpair));
+            wprintw(words_win,"%s", words[first_index]);
+            wattroff(words_win, COLOR_PAIR(colorpair));
+            wprintw(words_win," ");
+        }else{
+            wprintw(words_win,"%s ", words[first_index]);
+        }
+    }
+
+    int x_pos = getcurx(words_win);
+    for(int i = 0; i < col - x_pos; i++){
+        waddch(words_win, ' ');
+    }
+
+    int return_index = first_index;
+
+    wmove(words_win, 2, 2);
+    last_index = getlastindex(words, col, last_index);
+    for(;first_index < last_index; first_index++){
+        wprintw(words_win,"%s ", words[first_index]);
+    }
+
+    x_pos = getcurx(words_win);
+    for(int i = 0; i < col - x_pos; i++){
+        waddch(words_win, ' ');
+    }
+
+    wrefresh(words_win);
+
+    return return_index;
+}
+
+_Bool typedcorrect(char (*words)[LSIZ], char typedWord[], int typedwidx, int typedchidx){
+    for(int i = 0; i <= typedchidx; i++){
+        if(words[typedwidx][i] != typedWord[i]){
+            return 0;
+        }
+    }
+    return 1;
 }
 
 int main()
 {
+    WINDOW *words_win;
     srand(time(0));
     initscr();
     start_color();
     cbreak();
     noecho();
     keypad(stdscr, TRUE);
+    refresh();
+    init_pair(1, COLOR_BLACK, COLOR_RED);
+    init_pair(2, COLOR_BLACK, COLOR_BLUE);
 
     char line[RSIZ][LSIZ];
-    FILE *fptr = NULL;
+    FILE *fptr = fopen("words.txt", "r");
     int i = 0;
     int total = 0;
     char words[RSIZ][LSIZ];
 
-    fptr = fopen("words.txt", "r");
     while(fgets(line[i], LSIZ, fptr)){
         line[i][strlen(line[i]) - 1] = '\0';
         i++;
@@ -41,61 +95,70 @@ int main()
     for (i = 0; i < RSIZ; ++i){
         strncpy(words[i], line[rand() % (total)], LSIZ);
     }
-    //for (i = 0; i < 256; ++i) {
-    //    printf("%s\n\n", words[i]);
-    //}
 
-    //printf("%s", words[255]);
-    //printf("\n%lu", strlen(words[255]));
-    //printf("\n%lu", sizeof(words[255]));
+    char typedWord[LSIZ];
+    int ch;
 
-    char typed[LSIZ];
-    int max_row, max_col, ch;
-    int typed_index = 0;
-    getmaxyx(stdscr,max_row,max_col);
-    int mid_row = max_row/2;
-    int mid_col = max_col/2;
-    int current_row = mid_row+2;
-    int current_col = mid_col;
-    int start_col_input = current_col;
-    int start_col_output = mid_col;
-    int start_row_output = mid_row;
+    int starty_win = (LINES - BOX_HEIGHT) / 2;
+    int startx_win = (COLS - COLS/2) / 2;
+    words_win = newwin(BOX_HEIGHT, COLS/2, starty_win, startx_win);
+    wborder(words_win, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE, ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
 
-   //printwords(words, 0, , start_row_output,start_col_output);
+    int starty_type = LINES/2+BOX_HEIGHT/2;
+    int startx_type = COLS/2;
 
-    //printwords(words,last_index, getlastindex(words, mid_col-2, last_index), start_row_output+1,start_col_output);
-   printwords(words, 0, 10, start_row_output, start_col_output);
-   printwords(words, 10, 20, start_row_output+1, start_col_output);
+    int typedwidx = 0;
+    int typedchidx = 0;
+    int prntwidxtmp = 0;
+    int prntwidx = printwords(words, words_win, 0, typedwidx, 2);
 
-    move(current_row,current_col);
-    refresh();
+    int current_row;
+    int current_col;
 
-    //mvprintw(mid_row, (max_col-strlen(words))/2,"%s",words);
+    move(starty_type, startx_type);
+
     while(1){
+        //printw("%d ", typedwidx);
+        //printw("%d ", prntwidx);
+        //printw("%s ", typedWord);
+        //printw("%s ", words[typedwidx]);
+        refresh();
         switch ((ch = getch())) {
             case KEY_BACKSPACE:
                 getyx(stdscr, current_row, current_col);
-                if(current_col == mid_col)
+                if(current_col == startx_type)
                     break;
                 mvdelch(current_row, --current_col);
-                typed_index--;
+                typedchidx--;
                 break;
             case ENTER:
             case SPACE:
-                move(current_row,start_col_input);
+                move(starty_type, startx_type);
                 clrtoeol();
+                typedWord[typedchidx] = '\0';
+                typedchidx = 0;
+                typedwidx++;
+                if(prntwidx == typedwidx){
+                    prntwidxtmp = prntwidx;
+                    prntwidx = printwords(words, words_win, prntwidx, typedwidx, 2);
+                }
                 break;
             case CTRL_BACKSPACE:
-                move(current_row,start_col_input);
+                move(starty_type, startx_type);
                 clrtoeol();
+                typedchidx = 0;
                 break;
             default:
-                typed[typed_index] = ch;
+                typedWord[typedchidx] = ch;
                 addch(ch);
-                typed_index++;
+                typedchidx++;
         }
-        refresh();
-        if(typed_index == 255)
+        if(!typedcorrect(words, typedWord, typedwidx, typedchidx-1))
+            printwords(words, words_win, prntwidxtmp, typedwidx, 1);
+        else
+            printwords(words, words_win, prntwidxtmp, typedwidx, 2);
+
+        if(typedchidx == 31 || typedwidx == RSIZ-30)
             break;
         //if time 60 seconds break
     }
@@ -103,3 +166,4 @@ int main()
     endwin();
     return 0;
 }
+
