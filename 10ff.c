@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <signal.h>
+#include <unistd.h>
 
 #define BOX_HEIGHT 4
 #define CTRL_BACKSPACE 0x08
@@ -10,6 +12,8 @@
 #define SPACE ' '
 #define LSIZ 32
 #define RSIZ 300
+
+_Bool running = 1;
 
 int getlastindex(char (*words)[LSIZ], int box_len, int first_index){
     int ch_count = 0;
@@ -68,8 +72,13 @@ _Bool typedcorrect(char (*words)[LSIZ], char typedWord[], int typedwidx, int typ
     return 1;
 }
 
+void sig_handler(int signum){
+    running = 0;
+}
+
 int main()
 {
+    signal(SIGALRM, sig_handler);
     WINDOW *words_win;
     srand(time(0));
     initscr();
@@ -97,6 +106,8 @@ int main()
     }
 
     char typedWord[LSIZ];
+    int correctwords[RSIZ];
+    int cwidx = 0;
     int ch;
 
     int starty_win = (LINES - BOX_HEIGHT) / 2;
@@ -112,16 +123,15 @@ int main()
     int prntwidxtmp = 0;
     int prntwidx = printwords(words, words_win, 0, typedwidx, 2);
 
+    _Bool firstflag = 1;
+    int totalch = 0;
+
     int current_row;
     int current_col;
 
     move(starty_type, startx_type);
 
-    while(1){
-        //printw("%d ", typedwidx);
-        //printw("%d ", prntwidx);
-        //printw("%s ", typedWord);
-        //printw("%s ", words[typedwidx]);
+    while(running){
         refresh();
         switch ((ch = getch())) {
             case KEY_BACKSPACE:
@@ -133,11 +143,16 @@ int main()
                 break;
             case ENTER:
             case SPACE:
+                if(getcurx(stdscr) == startx_type)
+                    break;
                 move(starty_type, startx_type);
                 clrtoeol();
                 typedWord[typedchidx] = '\0';
-                typedchidx = 0;
+                if(typedcorrect(words, typedWord, typedwidx, typedchidx-1)){
+                    correctwords[cwidx++] = typedwidx;
+                }
                 typedwidx++;
+                typedchidx = 0;
                 if(prntwidx == typedwidx){
                     prntwidxtmp = prntwidx;
                     prntwidx = printwords(words, words_win, prntwidx, typedwidx, 2);
@@ -149,6 +164,10 @@ int main()
                 typedchidx = 0;
                 break;
             default:
+                if(firstflag){
+                    alarm(60);
+                    firstflag = 0;
+                }
                 typedWord[typedchidx] = ch;
                 addch(ch);
                 typedchidx++;
@@ -160,8 +179,14 @@ int main()
 
         if(typedchidx == 31 || typedwidx == RSIZ-30)
             break;
-        //if time 60 seconds break
     }
+    for(int i = 0; i < cwidx; i++){
+        totalch += strlen(words[correctwords[i]]);
+    }
+
+    printf("Typed %d words correct ", cwidx);
+    printf("Typed %d words wrong ", typedwidx - cwidx);
+    printf("WPM: %d ", totalch/5);
 
     endwin();
     return 0;
