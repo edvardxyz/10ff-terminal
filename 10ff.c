@@ -88,16 +88,46 @@ int main()
     keypad(stdscr, TRUE);
     refresh();
     init_pair(1, COLOR_BLACK, COLOR_RED);
-    init_pair(2, COLOR_BLACK, COLOR_BLUE);
+    init_pair(2, COLOR_BLACK, COLOR_GREEN);
 
     _Bool running = 1;
     char line[RSIZ][LSIZ];
-    FILE *fptr = fopen("words.txt", "r");
+    char tmp[LSIZ];
+    int ch;
+    int *stats;
+    FILE *fpwords = fopen("words.txt", "r");
+    if(fpwords == NULL){
+        printf("ERROR: No \"words.txt\"\n");
+        return 1;
+    }
+    FILE *fpstats = fopen("stats.txt", "r");
+    if(fpstats == NULL){
+        fpstats = fopen("stats.txt", "w");
+        fclose(fpstats);
+    }else{
+        // count lines
+        int linescount = 0;
+        while((ch = fgetc(fpstats))!= EOF){
+            if(ch == '\n')
+                linescount++;
+        }
+        fseek(fpstats, 0, SEEK_SET);
+        // create array with the size of lines in stats file
+        stats = (int *)malloc(linescount*sizeof(int));
+        int i = 0;
+        // put each string line as int into stats array
+        while(fgets(tmp, LSIZ, fpstats)){
+            tmp[strlen(tmp) - 1] = '\0';
+            *(stats+i) = atoi(tmp);
+            printw("%d ", *(stats+i));
+            i++;
+        }
+        fclose(fpstats);
+    }
     int i = 0;
     int total = 0;
     char words[RSIZ][LSIZ];
     char typedWord[LSIZ];
-    int ch;
     int starty_win = (LINES - BOX_HEIGHT) / 2;
     int startx_win = (COLS - COLS/2) / 2;
     int starty_type = LINES/2+BOX_HEIGHT/2;
@@ -106,12 +136,12 @@ int main()
     int current_col;
     words_win = newwin(BOX_HEIGHT, COLS/2, starty_win, startx_win);
     wborder(words_win, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE, ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
-
-    while(fgets(line[i], LSIZ, fptr)){
+    while(fgets(line[i], LSIZ, fpwords)){
         line[i][strlen(line[i]) - 1] = '\0';
         i++;
     }
     total = i;
+
 
     // restart here
     while(running){
@@ -168,7 +198,7 @@ int main()
                     if(typedchidx == 31)
                         continue;
                     if(firstflag){
-                        alarm(60);
+                        alarm(6);
                         firstflag = 0;
                     }
                     typedWord[typedchidx] = ch;
@@ -190,11 +220,18 @@ int main()
         mvprintw(starty_type+4,startx_type-10,"WPM: %d ", totalch/5);
         mvprintw(starty_type+5,startx_type-10,"Enter to play again");
 
+        // append wpm to stats.txt
+        fpstats = fopen("stats.txt", "a");
+        fprintf(fpstats, "%d%c", totalch/5, '\n');
+        fclose(fpstats);
+
         while(ch != ENTER){
             ch = getch();
         }
-        mvprintw(starty_type+5,startx_type-10,"                   ");
+        move(starty_type+5,0);
+        clrtoeol();
     }
+    fclose(fpwords);
     endwin();
     return 0;
 }
