@@ -1,10 +1,10 @@
+#include <cdk/cdkscreen.h>
 #include <ncurses.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <signal.h>
-#include <unistd.h>
+#include <cdk.h>
 
 #define BOX_HEIGHT 4
 #define CTRL_BACKSPACE 0x08
@@ -13,7 +13,6 @@
 #define LSIZ 32
 #define RSIZ 300
 
-_Bool typing = 1;
 
 int getlastindex(char (*words)[LSIZ], int box_len, int first_index){
     int ch_count = 0;
@@ -71,14 +70,36 @@ _Bool typedcorrect(char (*words)[LSIZ], char typedWord[], int typedwidx, int typ
     }
     return 1;
 }
+void showstats(){
+    char tmp[LSIZ];
+    int ch;
+    FILE *fpstats = fopen("stats.txt", "r");
+    wclear(stdscr);
+    // count lines
+    int linescount = 0;
+    while((ch = fgetc(fpstats))!= EOF){
+        if(ch == '\n')
+            linescount++;
+    }
+    fseek(fpstats, 0, SEEK_SET);
+    // create array with the size of lines in stats file
+    int *stats = (int *)malloc(linescount*sizeof(int));
+    int i = 0;
+    // put each string line as int into stats array
+    while(fgets(tmp, LSIZ, fpstats)){
+        tmp[strlen(tmp) - 1] = '\0';
+        *(stats+i) = atoi(tmp);
+        printw("%d ", *(stats+i));
+        i++;
+    }
 
-void sig_handler(int signum){
-    typing = 0;
+
+    fclose(fpstats);
+    free(stats);
 }
 
 int main()
 {
-    signal(SIGALRM, sig_handler);
     WINDOW *words_win;
     srand(time(0));
     initscr();
@@ -92,37 +113,11 @@ int main()
 
     _Bool running = 1;
     char line[RSIZ][LSIZ];
-    char tmp[LSIZ];
     int ch;
-    int *stats;
     FILE *fpwords = fopen("words.txt", "r");
     if(fpwords == NULL){
         printf("ERROR: No \"words.txt\"\n");
         return 1;
-    }
-    FILE *fpstats = fopen("stats.txt", "r");
-    if(fpstats == NULL){
-        fpstats = fopen("stats.txt", "w");
-        fclose(fpstats);
-    }else{
-        // count lines
-        int linescount = 0;
-        while((ch = fgetc(fpstats))!= EOF){
-            if(ch == '\n')
-                linescount++;
-        }
-        fseek(fpstats, 0, SEEK_SET);
-        // create array with the size of lines in stats file
-        stats = (int *)malloc(linescount*sizeof(int));
-        int i = 0;
-        // put each string line as int into stats array
-        while(fgets(tmp, LSIZ, fpstats)){
-            tmp[strlen(tmp) - 1] = '\0';
-            *(stats+i) = atoi(tmp);
-            printw("%d ", *(stats+i));
-            i++;
-        }
-        fclose(fpstats);
     }
     int i = 0;
     int total = 0;
@@ -135,7 +130,6 @@ int main()
     int current_row;
     int current_col;
     words_win = newwin(BOX_HEIGHT, COLS/2, starty_win, startx_win);
-    wborder(words_win, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE, ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
     while(fgets(line[i], LSIZ, fpwords)){
         line[i][strlen(line[i]) - 1] = '\0';
         i++;
@@ -145,7 +139,7 @@ int main()
 
     // restart here
     while(running){
-        typing = 1;
+        _Bool typing = 1;
         for (i = 0; i < RSIZ; ++i){
             strncpy(words[i], line[rand() % (total)], LSIZ);
         }
@@ -157,11 +151,12 @@ int main()
         int prntwidx = printwords(words, words_win, 0, typedwidx, 2);
         _Bool firstflag = 1;
         int totalch = 0;
-
+        time_t start_t;
+        wborder(words_win, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE, ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
+        wrefresh(words_win);
         move(starty_type, startx_type);
 
         while(typing){
-            refresh();
             switch ((ch = getch())) {
                 case KEY_BACKSPACE:
                     getyx(stdscr, current_row, current_col);
@@ -198,7 +193,7 @@ int main()
                     if(typedchidx == 31)
                         continue;
                     if(firstflag){
-                        alarm(6);
+                        time(&start_t);
                         firstflag = 0;
                     }
                     typedWord[typedchidx] = ch;
@@ -209,6 +204,8 @@ int main()
                 printwords(words, words_win, prntwidxtmp, typedwidx, 1);
             else
                 printwords(words, words_win, prntwidxtmp, typedwidx, 2);
+            if(time(NULL) - start_t > 60)
+                typing = 0;
 
         }
         for(i = 0; i < cwidx; i++){
@@ -219,17 +216,21 @@ int main()
         mvprintw(starty_type+3,startx_type-10,"Typed %d words wrong", typedwidx - cwidx);
         mvprintw(starty_type+4,startx_type-10,"WPM: %d ", totalch/5);
         mvprintw(starty_type+5,startx_type-10,"Enter to play again");
+        mvprintw(starty_type+6,startx_type-10,"F1 to show stats");
 
         // append wpm to stats.txt
-        fpstats = fopen("stats.txt", "a");
+        FILE *fpstats = fopen("stats.txt", "a");
         fprintf(fpstats, "%d%c", totalch/5, '\n');
         fclose(fpstats);
 
-        while(ch != ENTER){
-            ch = getch();
+        while((ch = getch())){
+            if(ch == ENTER)
+                break;
+            if(ch == KEY_F(1))
+                showstats();
         }
         move(starty_type+5,0);
-        clrtoeol();
+        clrtobot();
     }
     fclose(fpwords);
     endwin();
