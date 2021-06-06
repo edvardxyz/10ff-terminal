@@ -1,10 +1,14 @@
-#include <cdk/cdkscreen.h>
+#include <cdk/cdk_params.h>
 #include <ncurses.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <cdk.h>
+#include <cdk/binding.h>
+#include <cdk/cdkscreen.h>
+#include <cdk/cdk_objs.h>
+#include <cdk/graph.h>
 
 #define BOX_HEIGHT 4
 #define CTRL_BACKSPACE 0x08
@@ -71,6 +75,7 @@ _Bool typedcorrect(char (*words)[LSIZ], char typedWord[], int typedwidx, int typ
     return 1;
 }
 void showstats(){
+    int stats_height = LINES/4;
     char tmp[LSIZ];
     int ch;
     FILE *fpstats = fopen("stats.txt", "r");
@@ -93,9 +98,51 @@ void showstats(){
         i++;
     }
 
+///////// testing ////////////
 
-    fclose(fpstats);
-    free(stats);
+    CDKSCREEN *cdkscreen = 0;
+    CDKGRAPH *graph = 0;
+
+    cdkscreen = initCDKScreen(stdscr);
+
+    initCDKColor();
+    if(cdkscreen == 0){
+      /* Shut down CDK. */
+      destroyCDKScreen(cdkscreen);
+      endCDK();
+
+      printf ("initcdk screen failed");
+      exit(EXIT_FAILURE);
+    }
+
+   /* Create the graph widget. */
+   graph = newCDKGraph(cdkscreen, 0, stats_height, 0, 0, "yo", "xtitle", "ytitle");
+
+   /* Is the graph null? */
+   if (graph == 0)
+   {
+      /* Shut down CDK. */
+      destroyCDKScreen(cdkscreen);
+      endCDK();
+
+      printf ("Cannot make the graph widget. Is the window too small?\n");
+      exit(EXIT_FAILURE);
+   }
+
+   /* Set the graph values. */
+    wgetch(stdscr);
+   setCDKGraph(graph, stats, linescount, "0123456789", TRUE, vPLOT);
+
+   /* Draw the screen. */
+   refreshCDKScreen (cdkscreen);
+   drawCDKGraph(graph, FALSE);
+
+   /* Clean up. */
+   destroyCDKGraph(graph);
+   destroyCDKScreen(cdkscreen);
+   endCDK();
+   fclose(fpstats);
+   free(stats);
 }
 
 int main()
@@ -160,17 +207,21 @@ int main()
             switch ((ch = getch())) {
                 case KEY_BACKSPACE:
                     getyx(stdscr, current_row, current_col);
-                    if(current_col == startx_type)
+                    if(current_col == startx_type){
+                        move(starty_type, startx_type);
                         break;
+                    }
                     mvdelch(current_row, --current_col);
                     typedchidx--;
                     break;
                 case ENTER:
                 case SPACE:
                     if(typedwidx == RSIZ-30)
+                        return 1;
+                    if(getcurx(stdscr) == startx_type){
+                        move(starty_type, startx_type);
                         break;
-                    if(getcurx(stdscr) == startx_type)
-                        break;
+                    }
                     move(starty_type, startx_type);
                     clrtoeol();
                     typedWord[typedchidx] = '\0';
@@ -204,7 +255,7 @@ int main()
                 printwords(words, words_win, prntwidxtmp, typedwidx, 1);
             else
                 printwords(words, words_win, prntwidxtmp, typedwidx, 2);
-            if(time(NULL) - start_t > 60)
+            if(time(NULL) - start_t > 1 && !firstflag)
                 typing = 0;
 
         }
