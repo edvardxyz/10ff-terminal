@@ -1,14 +1,8 @@
-#include <cdk/cdk_params.h>
 #include <ncurses.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <cdk.h>
-#include <cdk/binding.h>
-#include <cdk/cdkscreen.h>
-#include <cdk/cdk_objs.h>
-#include <cdk/graph.h>
 
 #define BOX_HEIGHT 4
 #define CTRL_BACKSPACE 0x08
@@ -74,12 +68,16 @@ _Bool typedcorrect(char (*words)[LSIZ], char typedWord[], int typedwidx, int typ
     }
     return 1;
 }
+
 void showstats(){
-    int stats_height = LINES/4;
+    wclear(stdscr);
+    WINDOW *stats_win;
+
     char tmp[LSIZ];
     int ch;
+    int highestwpm = 0;
+    int lowestwpm = 999;
     FILE *fpstats = fopen("stats.txt", "r");
-    wclear(stdscr);
     // count lines
     int linescount = 0;
     while((ch = fgetc(fpstats))!= EOF){
@@ -94,55 +92,40 @@ void showstats(){
     while(fgets(tmp, LSIZ, fpstats)){
         tmp[strlen(tmp) - 1] = '\0';
         *(stats+i) = atoi(tmp);
-        printw("%d ", *(stats+i));
+        //wprintw(stats_win,"%d ", *(stats+i));
+        if(*(stats+i) > highestwpm)
+            highestwpm = *(stats+i);
+        if(*(stats+i) < lowestwpm)
+            lowestwpm = *(stats+i);
         i++;
     }
 
-///////// testing ////////////
+    //assume there is room enough
+    int statsheight = highestwpm - lowestwpm+2;
+    int statswidth = COLS-1;
+    int starty_stats = LINES/2-statsheight/2;
+    int startx_stats = 1;
+    int numpoints = linescount;
 
-    CDKSCREEN *cdkscreen = 0;
-    CDKGRAPH *graph = 0;
+    stats_win = newwin(statsheight, statswidth, starty_stats, startx_stats);
+    wborder(stats_win, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE, ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
 
-    cdkscreen = initCDKScreen(stdscr);
+    int idx = numpoints - statswidth - 1;
 
-    initCDKColor();
-    if(cdkscreen == 0){
-      /* Shut down CDK. */
-      destroyCDKScreen(cdkscreen);
-      endCDK();
-
-      printf ("initcdk screen failed");
-      exit(EXIT_FAILURE);
+    for(int i = 0; i < statswidth-2; i++){
+        mvwprintw(stats_win, statsheight-(stats[idx+i]-lowestwpm)-2, i+1, "%c", '*');
     }
 
-   /* Create the graph widget. */
-   graph = newCDKGraph(cdkscreen, 0, stats_height, 0, 0, "yo", "xtitle", "ytitle");
+        //mvwprintw(stats_win, starty_stats, 0, "%d", 0);
+    for (int i = 0; i < highestwpm; i+=5) {
+        mvwprintw(stats_win, statsheight-i, 0, "%d", lowestwpm+i);
+    }
 
-   /* Is the graph null? */
-   if (graph == 0)
-   {
-      /* Shut down CDK. */
-      destroyCDKScreen(cdkscreen);
-      endCDK();
 
-      printf ("Cannot make the graph widget. Is the window too small?\n");
-      exit(EXIT_FAILURE);
-   }
-
-   /* Set the graph values. */
-    wgetch(stdscr);
-   setCDKGraph(graph, stats, linescount, "0123456789", TRUE, vPLOT);
-
-   /* Draw the screen. */
-   refreshCDKScreen (cdkscreen);
-   drawCDKGraph(graph, FALSE);
-
-   /* Clean up. */
-   destroyCDKGraph(graph);
-   destroyCDKScreen(cdkscreen);
-   endCDK();
-   fclose(fpstats);
-   free(stats);
+    wrefresh(stats_win);
+    wgetch(stats_win);
+    fclose(fpstats);
+    free(stats);
 }
 
 int main()
@@ -183,10 +166,10 @@ int main()
     }
     total = i;
 
-
     // restart here
     while(running){
         _Bool typing = 1;
+        _Bool restart = 0;
         for (i = 0; i < RSIZ; ++i){
             strncpy(words[i], line[rand() % (total)], LSIZ);
         }
@@ -215,6 +198,9 @@ int main()
                     typedchidx--;
                     break;
                 case ENTER:
+                    typing = 0;
+                    restart = 1;
+                    break;
                 case SPACE:
                     if(typedwidx == RSIZ-30)
                         return 1;
@@ -255,7 +241,7 @@ int main()
                 printwords(words, words_win, prntwidxtmp, typedwidx, 1);
             else
                 printwords(words, words_win, prntwidxtmp, typedwidx, 2);
-            if(time(NULL) - start_t > 1 && !firstflag)
+            if(time(NULL) - start_t > 60 && !firstflag)
                 typing = 0;
 
         }
@@ -263,25 +249,33 @@ int main()
             totalch += strlen(words[correctwords[i]]) + 1;
         }
 
-        mvprintw(starty_type+2,startx_type-10,"Typed %d words correct", cwidx);
-        mvprintw(starty_type+3,startx_type-10,"Typed %d words wrong", typedwidx - cwidx);
-        mvprintw(starty_type+4,startx_type-10,"WPM: %d ", totalch/5);
-        mvprintw(starty_type+5,startx_type-10,"Enter to play again");
-        mvprintw(starty_type+6,startx_type-10,"F1 to show stats");
+        if(!restart){
+            mvprintw(starty_type+2,startx_type-10,"Typed %d words correct", cwidx);
+            mvprintw(starty_type+3,startx_type-10,"Typed %d words wrong", typedwidx - cwidx);
+            mvprintw(starty_type+4,startx_type-10,"WPM: %d ", totalch/5);
+            mvprintw(starty_type+5,startx_type-10,"Enter to play again");
+            mvprintw(starty_type+6,startx_type-10,"F1 to show stats");
 
-        // append wpm to stats.txt
-        FILE *fpstats = fopen("stats.txt", "a");
-        fprintf(fpstats, "%d%c", totalch/5, '\n');
-        fclose(fpstats);
+            // append wpm to stats.txt
+            if(totalch/5 > 80){
+                FILE *fpstats = fopen("stats.txt", "a");
+                fprintf(fpstats, "%d%c", totalch/5, '\n');
+                fclose(fpstats);
+            }
 
-        while((ch = getch())){
-            if(ch == ENTER)
-                break;
-            if(ch == KEY_F(1))
-                showstats();
+            while((ch = getch())){
+                if(ch == ENTER)
+                    break;
+                if(ch == KEY_F(1)){
+                    showstats();
+                    break;
+                }
+            }
+            move(starty_type+5,0);
+            clrtobot();
+
+
         }
-        move(starty_type+5,0);
-        clrtobot();
     }
     fclose(fpwords);
     endwin();
