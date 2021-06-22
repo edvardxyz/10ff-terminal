@@ -76,7 +76,7 @@ void showstats(){
     char tmp[LSIZ];
     int ch;
     int highestwpm = 0;
-    int lowestwpm = 999;
+    int lowestwpm = 420;
     FILE *fpstats = fopen("stats.txt", "r");
     // count lines
     int linescount = 0;
